@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>日程調整</title>
+  <style>
+    body { font-family: Arial, sans-serif; }
+    .container { max-width: 800px; margin: 0 auto; padding: 2rem; background: #f4f4f4; border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    input, select { width: 100%; padding: 8px; }
+    .btn { padding: 10px; background-color: #007bff; color: white; border: none; border-radius: 4px; width: 100%; cursor: pointer; }
+    pre { background: #eee; padding: 1rem; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>日程調整フォーム</h1>
+    <p>◯／×で候補日時に対する投票をお願いします。</p>
+
+    <table id="scheduleTable">
+      <thead>
+        <tr>
+          <th>名前</th>
+          <th>5月20日 13:00</th>
+          <th>5月21日 10:00</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><input type="text" id="name" placeholder="あなたの名前"></td>
+          <td>
+            <select id="schedule1">
+              <option>◯</option>
+              <option>△</option>
+              <option>×</option>
+            </select>
+          </td>
+          <td>
+            <select id="schedule2">
+              <option>◯</option>
+              <option>△</option>
+              <option>×</option>
+            </select>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <button class="btn" id="addScheduleBtn">投票する</button>
+
+    <h2>投票結果</h2>
+    <pre id="result"></pre>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDwT-VcbYojFmnoRvCXAJe0OT2IQQr1lSI",
+      authDomain: "schedule-adjustment-98d4f.firebaseapp.com",
+      projectId: "schedule-adjustment-98d4f",
+      storageBucket: "schedule-adjustment-98d4f.appspot.com",
+      messagingSenderId: "178226592097",
+      appId: "1:178226592097:web:6ef5b4823ca73320c2ed20",
+      measurementId: "G-N1HGYN6H91"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const nameInput = document.getElementById("name");
+    const schedule1Select = document.getElementById("schedule1");
+    const schedule2Select = document.getElementById("schedule2");
+    const resultArea = document.getElementById("result");
+
+    document.getElementById("addScheduleBtn").addEventListener("click", async () => {
+      const name = nameInput.value;
+      const schedule1 = schedule1Select.value;
+      const schedule2 = schedule2Select.value;
+
+      if (name && schedule1 && schedule2) {
+        try {
+          await addDoc(collection(db, "schedules"), {
+            name,
+            schedule1,
+            schedule2,
+          });
+          alert("投票が完了しました！");
+          displayResults(); // 結果を再取得
+        } catch (e) {
+          console.error("エラー:", e);
+          alert("送信に失敗しました");
+        }
+      } else {
+        alert("名前と選択を入力してください");
+      }
+    });
+
+    async function displayResults() {
+      const snapshot = await getDocs(collection(db, "schedules"));
+      const results = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        results.push(`${data.name}：5/20 → ${data.schedule1}、5/21 → ${data.schedule2}`);
+      });
+      resultArea.textContent = results.join("\n");
+    }
+
+    // 初回表示時に結果表示
+    displayResults();
+  </script>
+</body>
+</html>
