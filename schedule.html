@@ -2,53 +2,26 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>日程調整</title>
+  <title>ログイン</title>
   <style>
-    body { font-family: Arial, sans-serif; }
-    .container { max-width: 800px; margin: 0 auto; padding: 2rem; background: #f4f4f4; border-radius: 8px; }
-    .schedule-wrapper {
-      overflow-x: auto;
-      width: 100%;
-    }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-    input, select { width: 100%; padding: 8px; }
-    .btn { padding: 10px; background-color: #007bff; color: white; border: none; border-radius: 4px; width: 100%; cursor: pointer; }
-    pre { background: #eee; padding: 1rem; border-radius: 4px; }
+    body { font-family: Arial, sans-serif; padding: 2rem; background: #f4f4f4; }
+    .container { max-width: 400px; margin: 0 auto; padding: 2rem; background: #fff; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
+    .input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; }
+    .btn { width: 100%; padding: 10px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>日程調整フォーム</h1>
-    <p>◯／×で候補日時に対する投票をお願いします。</p>
-
-    <div class="schedule-wrapper">
-      <table id="scheduleTable">
-        <thead>
-          <tr>
-            <th>名前</th>
-            <!-- 日程列は動的に追加されます -->
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><input type="text" id="name" placeholder="あなたの名前"></td>
-            <!-- 日程列の選択肢は動的に追加されます -->
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <button class="btn" id="addScheduleBtn">投票する</button>
-
-    <h2>投票結果</h2>
-    <pre id="result"></pre>
+    <h1>ログイン</h1>
+    <input type="email" id="email" class="input" placeholder="メールアドレス" required>
+    <input type="password" id="password" class="input" placeholder="パスワード" required>
+    <button class="btn" id="loginBtn">ログイン</button>
+    <p>まだアカウントをお持ちでない方は <a href="signup.html">サインアップ</a></p>
   </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-firestore.js";
-    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-auth.js";
+    import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-auth.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDwT-VcbYojFmnoRvCXAJe0OT2IQQr1lSI",
@@ -61,92 +34,20 @@
     };
 
     const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
     const auth = getAuth(app);
 
-    // 🔐 ログイン状態の確認
-    onAuthStateChanged(auth, (user) => {
-      if (!user) {
-        alert("ログインが必要です。ログインページに移動します。");
-        window.location.href = "login.html";
+    document.getElementById("loginBtn").addEventListener("click", async () => {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+        window.location.href = "schedule.html";  // ログイン成功後、日程調整ページに移動
+      } catch (error) {
+        alert("ログインに失敗しました。再度試してください。");
+        console.error(error.message);
       }
     });
-
-    const nameInput = document.getElementById("name");
-    const resultArea = document.getElementById("result");
-    const scheduleTable = document.getElementById("scheduleTable");
-
-    const schedules = [
-      { date: "5月20日 13:00" },
-      { date: "5月21日 10:00" },
-      // 必要に応じて日程を追加できます
-    ];
-
-    // 日程列を動的に追加する
-    function createScheduleColumns() {
-      const headerRow = scheduleTable.querySelector("thead tr");
-      const bodyRow = scheduleTable.querySelector("tbody tr");
-
-      // 日程列のヘッダーを追加
-      schedules.forEach(schedule => {
-        const th = document.createElement("th");
-        th.textContent = schedule.date;
-        headerRow.appendChild(th);
-
-        // 各日程に対する選択肢を追加
-        const td = document.createElement("td");
-        const select = document.createElement("select");
-        select.innerHTML = `
-          <option>◯</option>
-          <option>△</option>
-          <option>×</option>
-        `;
-        td.appendChild(select);
-        bodyRow.appendChild(td);
-      });
-    }
-
-    createScheduleColumns(); // 初回に列を追加
-
-    document.getElementById("addScheduleBtn").addEventListener("click", async () => {
-      const name = nameInput.value;
-      if (name) {
-        const scheduleVotes = [];
-        const selects = scheduleTable.querySelectorAll("tbody td select");
-
-        selects.forEach(select => {
-          scheduleVotes.push(select.value);
-        });
-
-        try {
-          await addDoc(collection(db, "schedules"), {
-            name,
-            votes: scheduleVotes
-          });
-          alert("投票が完了しました！");
-          displayResults(); // 結果を再取得
-        } catch (e) {
-          console.error("エラー:", e);
-          alert("送信に失敗しました");
-        }
-      } else {
-        alert("名前を入力してください");
-      }
-    });
-
-    async function displayResults() {
-      const snapshot = await getDocs(collection(db, "schedules"));
-      const results = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        const votes = data.votes.map((vote, index) => `${schedules[index].date} → ${vote}`).join("、");
-        results.push(`${data.name}: ${votes}`);
-      });
-      resultArea.textContent = results.join("\n");
-    }
-
-    // 初回表示時に結果表示
-    displayResults();
   </script>
 </body>
 </html>
