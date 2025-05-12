@@ -6,6 +6,10 @@
   <style>
     body { font-family: Arial, sans-serif; }
     .container { max-width: 800px; margin: 0 auto; padding: 2rem; background: #f4f4f4; border-radius: 8px; }
+    .schedule-wrapper {
+      overflow-x: auto;
+      width: 100%;
+    }
     table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
     th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
     input, select { width: 100%; padding: 8px; }
@@ -18,34 +22,22 @@
     <h1>日程調整フォーム</h1>
     <p>◯／×で候補日時に対する投票をお願いします。</p>
 
-    <table id="scheduleTable">
-      <thead>
-        <tr>
-          <th>名前</th>
-          <th>5月20日 13:00</th>
-          <th>5月21日 10:00</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><input type="text" id="name" placeholder="あなたの名前"></td>
-          <td>
-            <select id="schedule1">
-              <option>◯</option>
-              <option>△</option>
-              <option>×</option>
-            </select>
-          </td>
-          <td>
-            <select id="schedule2">
-              <option>◯</option>
-              <option>△</option>
-              <option>×</option>
-            </select>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    <div class="schedule-wrapper">
+      <table id="scheduleTable">
+        <thead>
+          <tr>
+            <th>名前</th>
+            <!-- 日程列は動的に追加されます -->
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><input type="text" id="name" placeholder="あなたの名前"></td>
+            <!-- 日程列の選択肢は動的に追加されます -->
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
     <button class="btn" id="addScheduleBtn">投票する</button>
 
@@ -81,21 +73,55 @@
     });
 
     const nameInput = document.getElementById("name");
-    const schedule1Select = document.getElementById("schedule1");
-    const schedule2Select = document.getElementById("schedule2");
     const resultArea = document.getElementById("result");
+    const scheduleTable = document.getElementById("scheduleTable");
+
+    const schedules = [
+      { date: "5月20日 13:00" },
+      { date: "5月21日 10:00" },
+      // 必要に応じて日程を追加できます
+    ];
+
+    // 日程列を動的に追加する
+    function createScheduleColumns() {
+      const headerRow = scheduleTable.querySelector("thead tr");
+      const bodyRow = scheduleTable.querySelector("tbody tr");
+
+      // 日程列のヘッダーを追加
+      schedules.forEach(schedule => {
+        const th = document.createElement("th");
+        th.textContent = schedule.date;
+        headerRow.appendChild(th);
+
+        // 各日程に対する選択肢を追加
+        const td = document.createElement("td");
+        const select = document.createElement("select");
+        select.innerHTML = `
+          <option>◯</option>
+          <option>△</option>
+          <option>×</option>
+        `;
+        td.appendChild(select);
+        bodyRow.appendChild(td);
+      });
+    }
+
+    createScheduleColumns(); // 初回に列を追加
 
     document.getElementById("addScheduleBtn").addEventListener("click", async () => {
       const name = nameInput.value;
-      const schedule1 = schedule1Select.value;
-      const schedule2 = schedule2Select.value;
+      if (name) {
+        const scheduleVotes = [];
+        const selects = scheduleTable.querySelectorAll("tbody td select");
 
-      if (name && schedule1 && schedule2) {
+        selects.forEach(select => {
+          scheduleVotes.push(select.value);
+        });
+
         try {
           await addDoc(collection(db, "schedules"), {
             name,
-            schedule1,
-            schedule2,
+            votes: scheduleVotes
           });
           alert("投票が完了しました！");
           displayResults(); // 結果を再取得
@@ -104,7 +130,7 @@
           alert("送信に失敗しました");
         }
       } else {
-        alert("名前と選択を入力してください");
+        alert("名前を入力してください");
       }
     });
 
@@ -113,7 +139,8 @@
       const results = [];
       snapshot.forEach((doc) => {
         const data = doc.data();
-        results.push(`${data.name}：5/20 → ${data.schedule1}、5/21 → ${data.schedule2}`);
+        const votes = data.votes.map((vote, index) => `${schedules[index].date} → ${vote}`).join("、");
+        results.push(`${data.name}: ${votes}`);
       });
       resultArea.textContent = results.join("\n");
     }
