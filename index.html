@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>ようこそ</title>
+  <!-- 3秒後に login.html にリダイレクト -->
+  <meta http-equiv="refresh" content="3; url=login.html">
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      padding-top: 100px;
+      background-color: #f0f0f0;
+    }
+    .message {
+      font-size: 1.5em;
+      color: #333;
+    }
+  </style>
+  <script>
+    // JavaScriptでもリダイレクト（metaタグが効かない場合の保険）
+    setTimeout(() => {
+      window.location.href = "login.html";
+    }, 3000);
+  </script>
+</head>
+<body>
+  <div class="message">
+    <p>ようこそ</p>
+    <p>読み込み中です...</p>
+  </div>
+</body>
+</html>
