@@ -2,19 +2,59 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>日程調整サンプル</title>
+  <title>日程調整フォーム</title>
   <style>
-    body { font-family: Arial, sans-serif; }
-    .container { max-width: 800px; margin: 0 auto; padding: 2rem; background: #f4f4f4; border-radius: 8px; }
-    .schedule-wrapper {
-      overflow-x: auto;
-      width: 100%;
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      margin: 0;
+      padding: 0;
     }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-    input, select { width: 100%; padding: 8px; }
-    .btn { padding: 10px; background-color: #007bff; color: white; border: none; border-radius: 4px; width: 100%; cursor: pointer; }
-    pre { background: #eee; padding: 1rem; border-radius: 4px; }
+    .container {
+      max-width: 900px;
+      margin: 2rem auto;
+      padding: 2rem;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 1rem;
+    }
+    th, td {
+      padding: 8px;
+      text-align: center;
+      border-bottom: 1px solid #ccc;
+    }
+    th:not(:first-child), td:not(:first-child) {
+      border-left: 1px solid #eee;
+    }
+    input, select {
+      width: 100%;
+      padding: 8px;
+      box-sizing: border-box;
+    }
+    .btn {
+      padding: 10px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      width: 100%;
+      cursor: pointer;
+    }
+    .btn:hover {
+      background-color: #0056b3;
+    }
+    .add-schedule {
+      margin: 1rem 0;
+    }
+    .results-table {
+      margin-top: 2rem;
+      border-top: 2px solid #007bff;
+    }
   </style>
 </head>
 <body>
@@ -22,32 +62,43 @@
     <h1>日程調整フォーム</h1>
     <p>◯／×で候補日時に対する投票をお願いします！</p>
 
-    <div class="schedule-wrapper">
-      <table id="scheduleTable">
-        <thead>
-          <tr>
-            <th>名前</th>
-            <!-- 日程列は動的に追加されます -->
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><input type="text" id="name" placeholder="あなたの名前"></td>
-            <!-- 日程列の選択肢は動的に追加されます -->
-          </tr>
-        </tbody>
-      </table>
+    <table id="scheduleTable">
+      <thead>
+        <tr id="scheduleHeader">
+          <th>名前</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr id="voteRow">
+          <td><input type="text" id="name" placeholder="あなたの名前"></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="add-schedule">
+      <input type="text" id="newScheduleInput" placeholder="追加する日程（例：5月22日 14:00）">
+      <button class="btn" id="addNewScheduleBtn" style="margin-top: 0.5rem;">日程を追加</button>
     </div>
 
     <button class="btn" id="addScheduleBtn">投票する</button>
 
-    <h2>投票結果</h2>
-    <pre id="result"></pre>
+    <div class="results-table">
+      <h2>投票結果（一覧）</h2>
+      <table id="resultsTable">
+        <thead>
+          <tr id="resultsHeader">
+            <th>名前</th>
+          </tr>
+        </thead>
+        <tbody id="resultsBody">
+        </tbody>
+      </table>
+    </div>
   </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, getDocs, query, where } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-auth.js";
 
     const firebaseConfig = {
@@ -56,40 +107,45 @@
       projectId: "schedule-adjustment-98d4f",
       storageBucket: "schedule-adjustment-98d4f.appspot.com",
       messagingSenderId: "178226592097",
-      appId: "1:178226592097:web:6ef5b4823ca73320c2ed20",
-      measurementId: "G-N1HGYN6H91"
+      appId: "1:178226592097:web:6ef5b4823ca73320c2ed20"
     };
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     const auth = getAuth(app);
 
-    // 🔐 ログイン状態の確認
-    onAuthStateChanged(auth, (user) => {
-      if (!user) {
-        alert("ログインが必要です。ログインページに移動します。");
-        window.location.href = "login.html"; // ログインしていない場合はlogin.htmlにリダイレクト
-      }
-    });
-
     const nameInput = document.getElementById("name");
-    const resultArea = document.getElementById("result");
-    const scheduleTable = document.getElementById("scheduleTable");
+    const scheduleHeader = document.getElementById("scheduleHeader");
+    const voteRow = document.getElementById("voteRow");
+    const resultsHeader = document.getElementById("resultsHeader");
+    const resultsBody = document.getElementById("resultsBody");
 
     const schedules = [
       { date: "5月20日 13:00" },
-      { date: "5月21日 10:00" },
+      { date: "5月21日 10:00" }
     ];
 
-    // 日程列を動的に追加する
-    function createScheduleColumns() {
-      const headerRow = scheduleTable.querySelector("thead tr");
-      const bodyRow = scheduleTable.querySelector("tbody tr");
+    // 🔐 ログイン状態を確認
+    onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        alert("ログインが必要です。ログインページに移動します。");
+        window.location.href = "login.html";
+      }
+    });
+
+    function updateScheduleTable() {
+      scheduleHeader.innerHTML = '<th>名前</th>';
+      voteRow.innerHTML = '<td><input type="text" id="name" placeholder="あなたの名前"></td>';
+      resultsHeader.innerHTML = '<th>名前</th>';
 
       schedules.forEach(schedule => {
-        const th = document.createElement("th");
-        th.textContent = schedule.date;
-        headerRow.appendChild(th);
+        const th1 = document.createElement("th");
+        th1.textContent = schedule.date;
+        scheduleHeader.appendChild(th1);
+
+        const th2 = document.createElement("th");
+        th2.textContent = schedule.date;
+        resultsHeader.appendChild(th2);
 
         const td = document.createElement("td");
         const select = document.createElement("select");
@@ -99,49 +155,66 @@
           <option>×</option>
         `;
         td.appendChild(select);
-        bodyRow.appendChild(td);
+        voteRow.appendChild(td);
       });
     }
 
-    createScheduleColumns();
+    updateScheduleTable();
+
+    document.getElementById("addNewScheduleBtn").addEventListener("click", () => {
+      const newDate = document.getElementById("newScheduleInput").value.trim();
+      if (!newDate) return alert("日程を入力してください");
+      schedules.push({ date: newDate });
+      updateScheduleTable();
+      document.getElementById("newScheduleInput").value = "";
+    });
 
     document.getElementById("addScheduleBtn").addEventListener("click", async () => {
-      const name = nameInput.value;
-      if (name) {
-        const scheduleVotes = [];
-        const selects = scheduleTable.querySelectorAll("tbody td select");
+      const name = nameInput.value.trim();
+      if (!name) return alert("名前を入力してください");
 
-        selects.forEach(select => {
-          scheduleVotes.push(select.value);
-        });
+      // すでにその名前で投票していないか確認
+      const q = query(collection(db, "schedules"), where("name", "==", name));
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) {
+        alert("この名前ではすでに投票済みです。編集や削除はできません。");
+        return;
+      }
 
-        try {
-          await addDoc(collection(db, "schedules"), {
-            name,
-            votes: scheduleVotes
-          });
-          alert("投票が完了しました！");
-          displayResults(); 
-        } catch (e) {
-          console.error("エラー:", e);
-          alert("送信に失敗しました");
-        }
-      } else {
-        alert("名前を入力してください");
+      const selects = voteRow.querySelectorAll("select");
+      const votes = Array.from(selects).map(select => select.value);
+
+      try {
+        await addDoc(collection(db, "schedules"), { name, votes });
+        alert("投票が完了しました！");
+        displayResults();
+      } catch (e) {
+        console.error("エラー:", e);
+        alert("送信に失敗しました");
       }
     });
 
     async function displayResults() {
+      resultsBody.innerHTML = "";
       const snapshot = await getDocs(collection(db, "schedules"));
-      const results = [];
-      snapshot.forEach((doc) => {
+      snapshot.forEach(doc => {
         const data = doc.data();
-        const votes = data.votes.map((vote, index) => `${schedules[index].date} → ${vote}`).join("、");
-        results.push(`${data.name}: ${votes}`);
+        const row = document.createElement("tr");
+        const nameCell = document.createElement("td");
+        nameCell.textContent = data.name;
+        row.appendChild(nameCell);
+
+        for (let i = 0; i < schedules.length; i++) {
+          const td = document.createElement("td");
+          td.textContent = data.votes[i] || "";
+          row.appendChild(td);
+        }
+
+        resultsBody.appendChild(row);
       });
-      resultArea.textContent = results.join("\n");
     }
 
+    displayResults(); // 初回表示
   </script>
 </body>
 </html>
