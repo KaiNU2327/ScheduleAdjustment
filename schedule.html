@@ -114,7 +114,13 @@
     const db = getFirestore(app);
     const auth = getAuth(app);
 
-    const nameInput = document.getElementById("name");
+document.getElementById("addScheduleBtn").addEventListener("click", async () => {
+  const name = document.getElementById("name").value.trim(); // ← ここで毎回取得
+  if (!name) return alert("名前を入力してください");
+
+  // 以下略…
+});
+
     const scheduleHeader = document.getElementById("scheduleHeader");
     const voteRow = document.getElementById("voteRow");
     const resultsHeader = document.getElementById("resultsHeader");
